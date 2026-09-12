@@ -1,0 +1,44 @@
+name: Bootstrap YFC Online from OpenMAIC
+
+on:
+  push:
+    paths:
+      - .github/workflows/bootstrap-openmaic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout YFC Online
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import OpenMAIC
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf ./* ./.??* 2>/dev/null || true
+          git clone --depth 1 --branch main https://github.com/THU-MAIC/OpenMAIC.git /tmp/openmaic
+          rm -rf /tmp/openmaic/.git
+          cp -a /tmp/openmaic/. .
+
+          cat > YFC-ONLINE.md <<'EOF'
+          # YFC Online
+
+          YFC Online is the NahaLabs education platform built on top of OpenMAIC.
+
+          The OpenMAIC engine provides the multi-agent interactive classroom, while this repository is the home for YFC-specific branding, curriculum, configuration, and product development.
+
+          Upstream: https://github.com/THU-MAIC/OpenMAIC
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: bootstrap YFC Online from OpenMAIC" || exit 0
+          git push origin HEAD:main
