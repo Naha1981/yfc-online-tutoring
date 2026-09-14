@@ -68,5 +68,8 @@ export class OpenLiveClient {
 
 export function readOpenLiveUrl() {
   const candidate = (globalThis as typeof globalThis & { OPENLIVE_WS_URL?: unknown }).OPENLIVE_WS_URL
-  return typeof candidate === 'string' ? candidate.trim() : ''
+  if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+
+  // Phase 1 hosted companion fallback. This is a public, non-secret WebSocket URL.
+  return 'wss://nahalabs-openlive-agent-test.onrender.com/live'
 }
