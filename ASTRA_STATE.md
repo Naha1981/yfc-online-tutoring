@@ -5,11 +5,11 @@
 - **CURRENT PHASE:** Phase 1 — OpenLive-compatible voice + functional learner whiteboard
 - **CURRENT OBJECTIVE:** Verify hosted voice + ink interaction, then connect a real OpenLive companion endpoint before adding vision
 - **COMPLETED WORK:** Deterministic Grade 8 linear-equations classroom; structured teacher board actions; private lesson persistence boundary; functional learner pen/eraser/undo/clear ink using `perfect-freehand`; browser speech input/output with interruption control; optional OpenLive WebSocket adapter; engineering documentation and ADRs; destructive OpenMAIC bootstrap workflow removed from the development branch
-- **CURRENTLY WORKING:** Development branch ready for hosted verification and review
+- **CURRENTLY WORKING:** Draft PR #1 is open from `astra/openlive-whiteboard-phase1` into `main`; hosted verification is pending
 - **FILES ADDED:** Classroom/voice source, database migrations, docs, tests, Mini App shell and TypeScript configuration
 - **FILES CHANGED:** `src/App.tsx`, `package.json`, README/docs/state/handoff/changelog
 - **FILES REMOVED:** `.github/workflows/bootstrap-openmaic.yml` from this development branch because it overwrote repository contents with upstream OpenMAIC on push
-- **TESTS RUN:** Repository/source inspection; isolated TypeScript compilation for `src/voice/openLiveClient.ts` and `src/voice/tutorVoice.ts`
+- **TESTS RUN:** Repository/source inspection; current OpenLive protocol inspection; isolated TypeScript compilation for `src/voice/openLiveClient.ts` and `src/voice/tutorVoice.ts`
 - **TEST RESULTS:** Voice modules typecheck cleanly in isolation. Full application build, Mini App validator and hosted browser E2E were not run here because project dependencies are not installed and package downloads timed out.
 - **KNOWN BUGS:** No runtime defect is verified because hosted runtime testing remains pending. Browser SpeechRecognition availability varies by browser.
 - **KNOWN LIMITATIONS:** One deterministic lesson; no production LLM tutor; OpenLive companion service is not bundled; camera/screen transport not implemented; cloned voice/admin controls not implemented; learner ink is browser-local only
@@ -17,8 +17,8 @@
 - **ENVIRONMENT:** NahaLabs Mini App, React 19, TypeScript, Tailwind, Mini App relational persistence
 - **DATABASE STATUS:** Existing `lesson_sessions` schema preserved; migrations included on branch
 - **API STATUS:** Existing internal persistence boundary retained; OpenLive adapter is optional and not a production public API
-- **DEPLOYMENT STATUS:** Development branch only; hosted runtime verification pending
+- **DEPLOYMENT STATUS:** Development branch / draft PR only; no production deployment performed
 - **SECURITY STATUS:** No API keys added. No raw audio/video persisted by new code. OpenLive credentials are not embedded in source.
 - **NEXT SINGLE BEST ACTION:** Run the hosted browser acceptance journey for ink + browser voice, then configure an OpenLive companion endpoint and verify one real `user_text` → streamed `text_delta` → `done` → speech turn.
-- **LAST COMMIT:** `029b75d8c87b146e69d40a06c96b537fab9fca1d`
+- **LAST COMMIT:** `c7e8b7a4341b884c0e30e3a58c42f8472999d9d3`
 - **LAST UPDATED:** 2026-09-14
