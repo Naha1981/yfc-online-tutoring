@@ -1,0 +1,24 @@
+# ASTRA STATE
+
+- **PROJECT:** NahaLabs AI Whiteboard Tutor
+- **PRODUCT:** Classroom-first active tutoring platform
+- **CURRENT PHASE:** Phase 1 — OpenLive-compatible voice + functional learner whiteboard
+- **CURRENT OBJECTIVE:** Verify hosted voice + ink interaction, then connect a real OpenLive companion endpoint before adding vision
+- **COMPLETED WORK:** Deterministic Grade 8 linear-equations classroom; structured teacher board actions; private learner session persistence; functional learner pen/eraser/undo/clear ink using `perfect-freehand`; browser speech input/output with interruption control; optional OpenLive WebSocket adapter; engineering documentation and ADRs
+- **CURRENTLY WORKING:** GitHub delivery on dedicated development branch; hosted runtime verification pending
+- **FILES ADDED:** `src/InteractiveWhiteboard.tsx`, `src/voice/openLiveClient.ts`, `src/voice/tutorVoice.ts`, `src/voice/openLiveClient.test.ts`, Phase 1 ADRs
+- **FILES CHANGED:** `src/App.tsx`, `package.json`, README/docs/state/handoff/changelog
+- **FILES REMOVED:** None
+- **TESTS RUN:** Isolated TypeScript typecheck for voice modules; local source inspection
+- **TEST RESULTS:** Voice modules typecheck cleanly in isolation. Full application build/validator was not run in this environment because project dependencies are not installed and package downloads timed out.
+- **KNOWN BUGS:** No verified runtime defect; full bundle verification is pending. Browser SpeechRecognition availability varies by browser.
+- **KNOWN LIMITATIONS:** One deterministic lesson; no production LLM; OpenLive companion service is not bundled; camera/screen transport not implemented in this phase; cloned voice/admin controls not implemented; learner ink is local-browser persistence only
+- **BLOCKERS:** OpenLive end-to-end requires an accessible OpenLive `/live` companion endpoint. The current Mini App runtime does not provide that service by default.
+- **ENVIRONMENT:** NahaLabs Mini App, React 19, TypeScript, Tailwind, Mini App relational persistence
+- **DATABASE STATUS:** Existing private `lesson_sessions` persistence retained and untouched by Phase 1
+- **API STATUS:** Existing internal persistence boundary; OpenLive browser adapter is optional and not a public production API
+- **DEPLOYMENT STATUS:** Development branch only; hosted runtime verification pending
+- **SECURITY STATUS:** No API keys added. OpenLive URL is runtime configuration only. No raw audio/video is persisted by new code.
+- **NEXT SINGLE BEST ACTION:** Run the hosted browser acceptance journey for ink + voice; then configure an OpenLive companion endpoint and verify one real transcript → streamed reply → speech turn.
+- **LAST COMMIT:** `fa2cea0b1ae94d8b299f36ac1947aaa335c8033d`
+- **LAST UPDATED:** 2026-09-14
