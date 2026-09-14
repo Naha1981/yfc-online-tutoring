@@ -2,20 +2,56 @@ import http from 'node:http'
 import { WebSocketServer } from 'ws'
 
 const port = Number(process.env.PORT || process.env.AGENT_PORT || 8787)
-const tutorBaseUrl = (process.env.TUTOR_BASE_URL || '').replace(/\/$/, '')
+const provider = (process.env.TUTOR_PROVIDER || 'fallback').toLowerCase()
 const tutorApiKey = process.env.TUTOR_API_KEY || ''
 const tutorModel = process.env.TUTOR_MODEL || ''
+const tutorBaseUrl = resolveBaseUrl(provider, process.env.TUTOR_BASE_URL || '')
+const tutorTemperature = clampNumber(process.env.TUTOR_TEMPERATURE, 0.25, 0, 2)
+
+const PROVIDERS = {
+  openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', requiresKey: true },
+  openrouter: { label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', requiresKey: true },
+  groq: { label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', requiresKey: true },
+  gemini: { label: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', requiresKey: true },
+  ollama: { label: 'Ollama (local/self-hosted)', baseUrl: 'http://localhost:11434/v1', requiresKey: false },
+  lmstudio: { label: 'LM Studio (local)', baseUrl: 'http://localhost:1234/v1', requiresKey: false },
+}
+
+function clampNumber(value, fallback, min, max) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback
+}
+
+function resolveBaseUrl(name, explicit) {
+  const trimmed = explicit.trim().replace(/\/$/, '')
+  if (trimmed) return trimmed
+  return PROVIDERS[name]?.baseUrl || ''
+}
+
+function providerStatus() {
+  const preset = PROVIDERS[provider]
+  const needsKey = preset ? preset.requiresKey : provider !== 'fallback'
+  return {
+    provider,
+    providerLabel: preset?.label || (provider === 'fallback' ? 'Deterministic fallback' : 'Custom OpenAI-compatible'),
+    model: tutorModel || null,
+    configured: provider !== 'fallback' && Boolean(tutorBaseUrl && tutorModel && (!needsKey || tutorApiKey)),
+    baseUrlConfigured: Boolean(tutorBaseUrl),
+    keyConfigured: Boolean(tutorApiKey),
+    note: provider === 'fallback' ? 'No external LLM configured; using deterministic tutor.' : null,
+  }
+}
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', process.env.WEB_PUBLIC_URL || '*')
   res.setHeader('Access-Control-Allow-Headers', 'content-type')
-  if (req.url === '/health') {
+  if (req.url === '/health' || req.url === '/config') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({
       ok: true,
       service: 'nahalabs-openlive-agent',
       protocol: 'openlive-live-v1',
-      tutorProviderConfigured: Boolean(tutorBaseUrl && tutorApiKey && tutorModel),
+      tutor: providerStatus(),
     }))
     return
   }
@@ -35,42 +71,97 @@ function deterministicTeacherReply(text) {
   return `I heard you say: ${text}. Let us work through that carefully together.`
 }
 
-async function providerTeacherReply(history) {
-  if (!tutorBaseUrl || !tutorApiKey || !tutorModel) return null
+function tutorSystemPrompt(context) {
+  const grade = context?.grade || 'school'
+  const subject = context?.subject || 'the current subject'
+  const topic = context?.topic || 'the current topic'
+  const phase = context?.phase || 'the current lesson phase'
+  return [
+    `You are a patient South African ${grade} tutor for ${subject}, currently teaching ${topic}.`,
+    `The learner is in the ${phase} phase of a structured lesson.`,
+    'Teach step by step, ask one useful question at a time, never shame the learner, and prefer explaining reasoning over giving the final answer immediately.',
+    'Respect the teacher-led whiteboard flow. Keep spoken responses concise and natural for text-to-speech.',
+  ].join(' ')
+}
+
+async function providerTeacherReply(history, context, signal) {
+  if (!tutorBaseUrl || !tutorModel) return null
+  const preset = PROVIDERS[provider]
+  const needsKey = preset ? preset.requiresKey : provider !== 'fallback'
+  if (needsKey && !tutorApiKey) return null
+
+  const headers = { 'content-type': 'application/json' }
+  if (tutorApiKey) headers.authorization = `Bearer ${tutorApiKey}`
+  if (provider === 'openrouter') {
+    if (process.env.OPENROUTER_REFERER) headers['HTTP-Referer'] = process.env.OPENROUTER_REFERER
+    if (process.env.OPENROUTER_TITLE) headers['X-Title'] = process.env.OPENROUTER_TITLE
+  }
 
   const response = await fetch(`${tutorBaseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${tutorApiKey}`,
-    },
+    headers,
+    signal,
     body: JSON.stringify({
       model: tutorModel,
-      temperature: 0.25,
+      temperature: tutorTemperature,
+      stream: true,
       messages: [
-        {
-          role: 'system',
-          content: 'You are a patient South African school tutor. Teach step by step, ask one useful question at a time, never shame the learner, and prefer explaining reasoning over giving the final answer immediately. Keep responses concise enough to speak aloud.',
-        },
+        { role: 'system', content: tutorSystemPrompt(context) },
         ...history,
       ],
     }),
   })
 
   if (!response.ok) throw new Error(`Tutor provider returned HTTP ${response.status}`)
-  const data = await response.json()
-  const content = data?.choices?.[0]?.message?.content
-  return typeof content === 'string' && content.trim() ? content.trim() : null
+  if (!response.body) throw new Error('Tutor provider returned no response body')
+  return response.body
 }
 
 function emit(ws, event) {
   if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'sse', event }))
 }
 
+async function streamProviderReply(ws, state, context) {
+  const controller = new AbortController()
+  state.controller = controller
+  const body = await providerTeacherReply(state.history, context, controller.signal)
+  if (!body) return null
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let fullText = ''
+
+  while (!state.cancelled) {
+    const { value, done } = await reader.read()
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      const payload = line.slice(5).trim()
+      if (!payload || payload === '[DONE]') continue
+      let json
+      try { json = JSON.parse(payload) } catch { continue }
+      const delta = json?.choices?.[0]?.delta?.content
+      if (typeof delta === 'string' && delta) {
+        fullText += delta
+        emit(ws, { type: 'text_delta', text: delta })
+      }
+    }
+    if (done) break
+  }
+
+  try { await reader.cancel() } catch { /* best effort */ }
+  state.controller = null
+  return fullText.trim() || null
+}
+
 wss.on('connection', (ws, request) => {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
   const chat = url.searchParams.get('chat') || crypto.randomUUID()
-  const state = { cancelled: false, history: [] }
+  const state = { cancelled: false, history: [], controller: null }
   sessions.set(chat, state)
 
   ws.on('message', async raw => {
@@ -85,6 +176,7 @@ wss.on('connection', (ws, request) => {
 
     if (message.t === 'cancel') {
       state.cancelled = true
+      try { state.controller?.abort() } catch { /* best effort */ }
       return
     }
 
@@ -100,37 +192,44 @@ wss.on('connection', (ws, request) => {
 
     state.cancelled = false
     state.history.push({ role: 'user', content: text })
-    state.history = state.history.slice(-10)
+    state.history = state.history.slice(-12)
     emit(ws, { type: 'status', text: 'Thinking…' })
 
-    let answer
+    let answer = null
     try {
-      answer = await providerTeacherReply(state.history)
-      if (!answer) answer = deterministicTeacherReply(text)
+      answer = await streamProviderReply(ws, state, message.context || {})
     } catch (error) {
-      console.error('Tutor provider error:', error?.message || error)
-      answer = deterministicTeacherReply(text)
+      if (!state.cancelled) console.error('Tutor provider error:', error?.message || error)
     }
 
-    if (!state.cancelled) state.history.push({ role: 'assistant', content: answer })
+    if (!answer && !state.cancelled) {
+      answer = deterministicTeacherReply(text)
+      let cursor = 0
+      const timer = setInterval(() => {
+        if (state.cancelled || ws.readyState !== 1) {
+          clearInterval(timer)
+          return
+        }
+        const next = Math.min(cursor + 8, answer.length)
+        emit(ws, { type: 'text_delta', text: answer.slice(cursor, next) })
+        cursor = next
+        if (cursor >= answer.length) {
+          clearInterval(timer)
+          emit(ws, { type: 'done' })
+        }
+      }, 18)
+    } else if (answer && !state.cancelled) {
+      emit(ws, { type: 'done' })
+    }
 
-    let cursor = 0
-    const timer = setInterval(() => {
-      if (state.cancelled || ws.readyState !== 1) {
-        clearInterval(timer)
-        return
-      }
-      const next = Math.min(cursor + 8, answer.length)
-      emit(ws, { type: 'text_delta', text: answer.slice(cursor, next) })
-      cursor = next
-      if (cursor >= answer.length) {
-        clearInterval(timer)
-        emit(ws, { type: 'done' })
-      }
-    }, 18)
+    if (answer && !state.cancelled) state.history.push({ role: 'assistant', content: answer })
   })
 
-  ws.on('close', () => sessions.delete(chat))
+  ws.on('close', () => {
+    state.cancelled = true
+    try { state.controller?.abort() } catch { /* best effort */ }
+    sessions.delete(chat)
+  })
 })
 
 server.on('upgrade', (request, socket, head) => {
