@@ -1,0 +1,19 @@
+{
+  "dependencies": {
+    "@supabase/postgrest-js": "^1.15.0",
+    "lucide-react": "^0.400.0",
+    "perfect-freehand": "^1.2.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.0.0",
+    "tailwindcss": "^4.1.17"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,24 @@
+# ASTRA STATE
+
+- **PROJECT:** NahaLabs AI Whiteboard Tutor
+- **PRODUCT:** Classroom-first active tutoring platform
+- **CURRENT PHASE:** Phase 1 — OpenLive-compatible voice + functional learner whiteboard; provider-flexible tutor gateway added
+- **CURRENT OBJECTIVE:** Verify hosted voice + ink interaction, then harden streaming/interruption before adding camera/screen vision
+- **COMPLETED WORK:** Deterministic Grade 8 linear-equations classroom; structured teacher board actions; private lesson persistence boundary; functional learner pen/eraser/undo/clear ink using `perfect-freehand`; browser speech input/output with interruption control; optional OpenLive WebSocket adapter with public hosted fallback; hosted OpenLive-compatible companion service; provider-neutral LLM gateway with OpenAI, OpenRouter, Groq, Gemini, Ollama, LM Studio and custom OpenAI-compatible profiles; engineering documentation and ADRs; destructive OpenMAIC bootstrap workflow removed from the development branch
+- **CURRENTLY WORKING:** Draft PR #1 is open from `astra/openlive-whiteboard-phase1` into `main`; hosted companion is live; provider configuration is server-side only
+- **FILES ADDED:** Classroom/voice source, OpenLive companion service, `.env.example`, multi-provider documentation, database migrations, docs, tests, Mini App shell and TypeScript configuration
+- **FILES CHANGED:** `src/App.tsx`, `src/voice/openLiveClient.ts`, `services/openlive-agent/server.mjs`, `package.json`, README/docs/state/handoff/changelog
+- **FILES REMOVED:** `.github/workflows/bootstrap-openmaic.yml` from this development branch because it overwrote repository contents with upstream OpenMAIC on push
+- **TESTS RUN:** Repository/source inspection; current OpenLive protocol inspection; isolated TypeScript compilation for voice modules; Render deployment verification
+- **TEST RESULTS:** Render service `nahalabs-openlive-agent-test` is LIVE. The companion successfully builds with npm and listens on Render's assigned port. Provider streaming path is implemented but has not been externally exercised against a live third-party API in this environment because no provider secret was supplied.
+- **KNOWN BUGS:** Browser-level hosted WebSocket/speech acceptance test has not yet been executed in a real browser environment here.
+- **KNOWN LIMITATIONS:** One deterministic lesson fallback; production LLM quality depends on configured provider/model; Phase 1 hosted companion is a lightweight OpenLive-compatible bridge rather than the full upstream OpenLive local voice-model stack; camera/screen capture is not implemented in the UI; cloned voice/admin controls are not implemented; learner ink is browser-local only
+- **BLOCKERS:** No blocker for provider architecture. A third-party API key is required to activate a remote provider; local Ollama/LM Studio require the companion to be able to reach the local/self-hosted endpoint.
+- **ENVIRONMENT:** NahaLabs Mini App, React 19, TypeScript, Tailwind, Mini App relational persistence
+- **DATABASE STATUS:** Existing `lesson_sessions` schema preserved; migrations included on branch
+- **API STATUS:** `/live` OpenLive-compatible WebSocket; `/health` and `/config` expose non-secret provider status only
+- **DEPLOYMENT STATUS:** Hosted OpenLive companion is LIVE on Render; frontend branch remains under PR #1
+- **SECURITY STATUS:** Provider API keys remain server-side and are never returned by `/health` or `/config`. No raw audio/video persisted by new code.
+- **NEXT SINGLE BEST ACTION:** Choose a provider profile (OpenRouter free is the lowest-cost remote path), add its server-side key/model in Render, redeploy, and verify one real streamed tutor turn; then move to Phase 2 interruption hardening.
+- **LAST COMMIT:** `0ee39ce7d6c4e45acf674b0b5203399d13f28000`
+- **LAST UPDATED:** 2026-09-14
